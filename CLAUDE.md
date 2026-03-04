@@ -31,10 +31,7 @@ cargo build --no-default-features --features onnx
 
 ## Architecture
 
-- **Workspace root** at repo root, crates live under `crates/`
-- Member pattern: `members = ["crates/*"]`
-- Workspace inheritance for version, edition, dependencies, and lints
-- One crate: `crates/mcp-server-qdrant`
+- Single crate at repo root
 
 ### Modules
 
