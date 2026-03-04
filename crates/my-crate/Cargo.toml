@@ -1,6 +1,0 @@
-[package]
-name = "my-crate"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
