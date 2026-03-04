@@ -53,7 +53,7 @@ clap = { version = "4", features = ["derive", "env"] }
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-schemars = "0.8"
+schemars = "1"
 
 # Error handling
 thiserror = "2"
@@ -62,6 +62,10 @@ anyhow = "1"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# HTTP server
+axum = "0.8"
+tokio-util = "0.7"
 
 # Misc
 uuid = { version = "1", features = ["v4"] }
