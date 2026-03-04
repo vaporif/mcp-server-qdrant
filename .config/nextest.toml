@@ -1,0 +1,12 @@
+[test-groups.e2e]
+max-threads = 1
+
+[[profile.default.overrides]]
+filter = "binary(e2e_test)"
+test-group = "e2e"
+
+[profile.ci]
+
+[[profile.ci.overrides]]
+filter = "binary(e2e_test)"
+test-group = "e2e"
