@@ -17,8 +17,12 @@
   in {
     formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.alejandra);
 
-    devShells = forAllSystems (system: {
-      default = devshells.devShells.${system}.rust;
+    devShells = forAllSystems (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+    in {
+      default = devshells.devShells.${system}.rust.overrideAttrs (old: {
+        packages = (old.packages or []) ++ [pkgs.qdrant];
+      });
     });
   };
 }

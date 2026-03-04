@@ -19,6 +19,11 @@ build-release:
 test *args:
     cargo nextest run {{args}}
 
+# Run e2e tests (requires running Qdrant)
+[group('test')]
+e2e *args:
+    cargo nextest run --run-ignored ignored-only {{args}}
+
 # Lint code
 [group('lint')]
 lint:
