@@ -121,6 +121,7 @@ pub struct Config {
 }
 
 impl Config {
+    #[allow(clippy::result_large_err)]
     pub fn from_cli(cli: Cli) -> Result<Self, crate::errors::Error> {
         let location = match (&cli.qdrant_url, &cli.qdrant_local_path) {
             (Some(url), None) => QdrantLocation::Remote {
@@ -159,7 +160,7 @@ impl Config {
             },
         };
 
-        Ok(Config {
+        Ok(Self {
             qdrant: QdrantConfig {
                 location,
                 collection_name: cli.collection_name,

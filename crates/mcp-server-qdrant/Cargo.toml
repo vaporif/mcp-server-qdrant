@@ -2,6 +2,12 @@
 name = "mcp-server-qdrant"
 version.workspace = true
 edition.workspace = true
+description = "MCP server for Qdrant vector database with local embedding support"
+license = "Apache-2.0"
+repository = "https://github.com/vaporif/mcp-server-qdrant"
+readme = "../../README.md"
+keywords = ["mcp", "qdrant", "embeddings", "vector-database"]
+categories = ["command-line-utilities"]
 
 [lints]
 workspace = true

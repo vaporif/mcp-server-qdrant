@@ -30,9 +30,8 @@ impl CandleEmbedder {
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|e| anyhow::anyhow!("failed to load tokenizer: {e}"))?;
 
-        let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)?
-        };
+        let vb =
+            unsafe { VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)? };
         let model = BertModel::load(vb, &config)?;
 
         Ok(Self {
@@ -54,7 +53,11 @@ impl CandleEmbedder {
             .map_err(|e| anyhow::anyhow!("tokenization failed: {e}"))?;
 
         let batch_size = encodings.len();
-        let max_len = encodings.iter().map(|e| e.get_ids().len()).max().unwrap_or(0);
+        let max_len = encodings
+            .iter()
+            .map(|e| e.get_ids().len())
+            .max()
+            .unwrap_or(0);
 
         let mut input_ids = vec![0u32; batch_size * max_len];
         let mut type_ids = vec![0u32; batch_size * max_len];
@@ -71,10 +74,8 @@ impl CandleEmbedder {
             attention_mask[offset..offset + seq_len].copy_from_slice(mask);
         }
 
-        let input_ids =
-            Tensor::from_vec(input_ids, (batch_size, max_len), &self.device)?;
-        let type_ids =
-            Tensor::from_vec(type_ids, (batch_size, max_len), &self.device)?;
+        let input_ids = Tensor::from_vec(input_ids, (batch_size, max_len), &self.device)?;
+        let type_ids = Tensor::from_vec(type_ids, (batch_size, max_len), &self.device)?;
         let attention_mask_tensor =
             Tensor::from_vec(attention_mask, (batch_size, max_len), &self.device)?;
 

@@ -55,7 +55,11 @@ impl OnnxEmbedder {
             .map_err(|e| anyhow::anyhow!("tokenization failed: {e}"))?;
 
         let batch_size = encodings.len();
-        let max_len = encodings.iter().map(|e| e.get_ids().len()).max().unwrap_or(0);
+        let max_len = encodings
+            .iter()
+            .map(|e| e.get_ids().len())
+            .max()
+            .unwrap_or(0);
 
         let mut input_ids = Array2::<i64>::zeros((batch_size, max_len));
         let mut attention_mask = Array2::<i64>::zeros((batch_size, max_len));

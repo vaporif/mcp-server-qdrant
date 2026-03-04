@@ -23,7 +23,7 @@ pub fn create_embedding_provider(model_name: &str) -> anyhow::Result<Box<dyn Emb
         return Ok(Box::new(CandleEmbedder::new(model_name)?));
     }
 
-    #[cfg(any(feature = "onnx", feature = "onnx-fetch"))]
+    #[cfg(all(any(feature = "onnx", feature = "onnx-fetch"), not(feature = "candle")))]
     {
         return Ok(Box::new(OnnxEmbedder::new(model_name)?));
     }
