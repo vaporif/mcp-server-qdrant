@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use hf_hub::api::sync::Api;
@@ -8,43 +8,70 @@ use ort::value::Tensor;
 use tokenizers::Tokenizer;
 
 use super::EmbeddingProvider;
+use crate::errors::{Error, Result};
 
 pub struct OnnxEmbedder {
+    inner: Arc<OnnxInner>,
+}
+
+struct OnnxInner {
     session: Mutex<Session>,
     tokenizer: Tokenizer,
     dimension: usize,
 }
 
+// Safety: Session is guarded by Mutex, Tokenizer is thread-safe.
+unsafe impl Send for OnnxInner {}
+unsafe impl Sync for OnnxInner {}
+
 impl OnnxEmbedder {
-    pub fn new(model_name: &str) -> anyhow::Result<Self> {
-        let repo = Api::new()?.model(model_name.to_string());
+    pub fn new(model_name: &str) -> Result<Self> {
+        let repo = Api::new()
+            .map_err(|e| Error::ModelDownload(e.to_string()))?
+            .model(model_name.to_string());
 
-        let config_path = repo.get("config.json")?;
-        let tokenizer_path = repo.get("tokenizer.json")?;
-        let onnx_path = repo.get("onnx/model.onnx")?;
+        let config_path = repo
+            .get("config.json")
+            .map_err(|e| Error::ModelDownload(e.to_string()))?;
+        let tokenizer_path = repo
+            .get("tokenizer.json")
+            .map_err(|e| Error::ModelDownload(e.to_string()))?;
+        let onnx_path = repo
+            .get("onnx/model.onnx")
+            .map_err(|e| Error::ModelDownload(e.to_string()))?;
 
-        let config: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(&config_path)?)?;
+        let config: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(&config_path)
+                .map_err(|e| Error::ModelDownload(e.to_string()))?,
+        )
+        .map_err(|e| Error::ModelDownload(e.to_string()))?;
         let dimension = config["hidden_size"]
             .as_u64()
-            .ok_or_else(|| anyhow::anyhow!("missing hidden_size in config.json"))?;
-        let dimension =
-            usize::try_from(dimension).map_err(|_| anyhow::anyhow!("hidden_size too large"))?;
+            .ok_or_else(|| Error::Config("missing hidden_size in config.json".into()))?;
+        let dimension = usize::try_from(dimension)
+            .map_err(|_| Error::Config("hidden_size too large".into()))?;
 
-        let tokenizer = Tokenizer::from_file(&tokenizer_path)
-            .map_err(|e| anyhow::anyhow!("failed to load tokenizer: {e}"))?;
+        let tokenizer =
+            Tokenizer::from_file(&tokenizer_path).map_err(|e| Error::Tokenizer(e.to_string()))?;
 
-        let session = Session::builder()?.commit_from_file(&onnx_path)?;
+        let session = Session::builder()
+            .map_err(|e| Error::Embedding(e.to_string()))?
+            .commit_from_file(&onnx_path)
+            .map_err(|e| Error::Embedding(e.to_string()))?;
 
         Ok(Self {
-            session: Mutex::new(session),
-            tokenizer,
-            dimension,
+            inner: Arc::new(OnnxInner {
+                session: Mutex::new(session),
+                tokenizer,
+                dimension,
+            }),
         })
     }
+}
 
+impl OnnxInner {
     #[allow(clippy::cast_precision_loss)]
-    fn embed_sync(&self, texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
+    fn embed_sync(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
         if texts.is_empty() {
             return Ok(vec![]);
         }
@@ -52,7 +79,7 @@ impl OnnxEmbedder {
         let encodings = self
             .tokenizer
             .encode_batch(texts.to_vec(), true)
-            .map_err(|e| anyhow::anyhow!("tokenization failed: {e}"))?;
+            .map_err(|e| Error::Tokenizer(e.to_string()))?;
 
         let batch_size = encodings.len();
         let max_len = encodings
@@ -77,23 +104,29 @@ impl OnnxEmbedder {
             }
         }
 
-        let input_ids_tensor = Tensor::from_array(input_ids.clone())?;
-        let attention_mask_tensor = Tensor::from_array(attention_mask.clone())?;
-        let token_type_ids_tensor = Tensor::from_array(token_type_ids)?;
+        let input_ids_tensor =
+            Tensor::from_array(input_ids.clone()).map_err(|e| Error::Embedding(e.to_string()))?;
+        let attention_mask_tensor = Tensor::from_array(attention_mask.clone())
+            .map_err(|e| Error::Embedding(e.to_string()))?;
+        let token_type_ids_tensor =
+            Tensor::from_array(token_type_ids).map_err(|e| Error::Embedding(e.to_string()))?;
 
         let mut session = self
             .session
             .lock()
-            .map_err(|e| anyhow::anyhow!("session lock poisoned: {e}"))?;
+            .map_err(|e| Error::Embedding(format!("session lock poisoned: {e}")))?;
 
-        let outputs = session.run(ort::inputs![
-            "input_ids" => input_ids_tensor,
-            "attention_mask" => attention_mask_tensor,
-            "token_type_ids" => token_type_ids_tensor,
-        ])?;
+        let outputs = session
+            .run(ort::inputs![
+                "input_ids" => input_ids_tensor,
+                "attention_mask" => attention_mask_tensor,
+                "token_type_ids" => token_type_ids_tensor,
+            ])
+            .map_err(|e| Error::Embedding(e.to_string()))?;
 
-        let (shape, output_data) = outputs[0].try_extract_tensor::<f32>()?;
-        // Shape derefs to &[i64], dims should be [batch_size, seq_len, hidden_size]
+        let (shape, output_data) = outputs[0]
+            .try_extract_tensor::<f32>()
+            .map_err(|e| Error::Embedding(e.to_string()))?;
         let hidden_size = shape
             .get(2)
             .and_then(|&d| usize::try_from(d).ok())
@@ -137,19 +170,31 @@ impl OnnxEmbedder {
 
 #[async_trait]
 impl EmbeddingProvider for OnnxEmbedder {
-    async fn embed(&self, text: &str) -> anyhow::Result<Vec<f32>> {
-        let texts = vec![text.to_string()];
-        let mut results = self.embed_sync(&texts)?;
-        results
-            .pop()
-            .ok_or_else(|| anyhow::anyhow!("empty embedding result"))
+    async fn embed(&self, text: &str) -> Result<Vec<f32>> {
+        let inner = self.inner.clone();
+        let text = text.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            let texts = vec![text];
+            let mut results = inner.embed_sync(&texts)?;
+            results
+                .pop()
+                .ok_or_else(|| Error::Embedding("empty embedding result".into()))
+        })
+        .await
+        .map_err(|e| Error::Embedding(format!("spawn_blocking join: {e}")))?
     }
 
-    async fn embed_batch(&self, texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
-        self.embed_sync(texts)
+    async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        let inner = self.inner.clone();
+        let texts = texts.to_vec();
+
+        tokio::task::spawn_blocking(move || inner.embed_sync(&texts))
+            .await
+            .map_err(|e| Error::Embedding(format!("spawn_blocking join: {e}")))?
     }
 
     fn dimension(&self) -> usize {
-        self.dimension
+        self.inner.dimension
     }
 }

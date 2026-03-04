@@ -81,8 +81,7 @@ pub enum TransportArg {
 
 pub enum Transport {
     Stdio,
-    Sse { host: IpAddr, port: u16 },
-    StreamableHttp { host: IpAddr, port: u16 },
+    Http { host: IpAddr, port: u16 },
 }
 
 pub enum QdrantLocation {
@@ -121,7 +120,6 @@ pub struct Config {
 }
 
 impl Config {
-    #[allow(clippy::result_large_err)]
     pub fn from_cli(cli: Cli) -> Result<Self, crate::errors::Error> {
         let location = match (&cli.qdrant_url, &cli.qdrant_local_path) {
             (Some(url), None) => QdrantLocation::Remote {
@@ -150,11 +148,7 @@ impl Config {
 
         let transport = match cli.transport {
             TransportArg::Stdio => Transport::Stdio,
-            TransportArg::Sse => Transport::Sse {
-                host: cli.host,
-                port: cli.port,
-            },
-            TransportArg::StreamableHttp => Transport::StreamableHttp {
+            TransportArg::Sse | TransportArg::StreamableHttp => Transport::Http {
                 host: cli.host,
                 port: cli.port,
             },

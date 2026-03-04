@@ -3,7 +3,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("qdrant: {0}")]
-    Qdrant(#[from] qdrant_client::QdrantError),
+    Qdrant(Box<qdrant_client::QdrantError>),
 
     #[error("embedding: {0}")]
     Embedding(String),
@@ -22,6 +22,12 @@ pub enum Error {
 
     #[error("model download: {0}")]
     ModelDownload(String),
+}
+
+impl From<qdrant_client::QdrantError> for Error {
+    fn from(e: qdrant_client::QdrantError) -> Self {
+        Self::Qdrant(Box::new(e))
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

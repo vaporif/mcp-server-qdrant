@@ -38,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
             let service = server.serve(rmcp::transport::stdio()).await?;
             service.waiting().await?;
         }
-        Transport::Sse { host, port } | Transport::StreamableHttp { host, port } => {
+        Transport::Http { host, port } => {
             let addr = std::net::SocketAddr::new(*host, *port);
             tracing::info!("starting HTTP transport on {addr}");
 

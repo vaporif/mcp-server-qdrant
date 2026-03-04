@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use rmcp::handler::server::tool::ToolRouter;
@@ -10,6 +11,10 @@ use serde_json::Value;
 
 use crate::config::Config;
 use crate::qdrant::{Entry, QdrantConnector};
+
+const DEFAULT_STORE_DESCRIPTION: &str =
+    "Keep the memory for later use, when you are asked to remember something.";
+const DEFAULT_FIND_DESCRIPTION: &str = "Look up memories in Qdrant. Use this tool when you need to: \n - Find memories by their content \n - Access memories for further analysis \n - Get some personal information about the user";
 
 #[derive(Deserialize, JsonSchema)]
 pub struct StoreParams {
@@ -44,10 +49,31 @@ pub struct QdrantMcpServer {
 
 impl QdrantMcpServer {
     pub fn new(connector: Arc<QdrantConnector>, config: Arc<Config>) -> Self {
+        let mut tool_router = Self::tool_router();
+
+        // Override tool descriptions from config or defaults
+        let store_desc: Cow<'static, str> = config
+            .tools
+            .store_description
+            .clone()
+            .map_or(Cow::Borrowed(DEFAULT_STORE_DESCRIPTION), Cow::Owned);
+        let find_desc: Cow<'static, str> = config
+            .tools
+            .find_description
+            .clone()
+            .map_or(Cow::Borrowed(DEFAULT_FIND_DESCRIPTION), Cow::Owned);
+
+        if let Some(route) = tool_router.map.get_mut("qdrant-store") {
+            route.attr.description = Some(store_desc);
+        }
+        if let Some(route) = tool_router.map.get_mut("qdrant-find") {
+            route.attr.description = Some(find_desc);
+        }
+
         Self {
             connector,
             config,
-            tool_router: Self::tool_router(),
+            tool_router,
         }
     }
 
@@ -163,17 +189,23 @@ impl ServerHandler for QdrantMcpServer {
     }
 }
 
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 fn format_entries(entries: &[crate::qdrant::Entry]) -> String {
     let mut out = String::new();
     for entry in entries {
         out.push_str("<entry>");
         out.push_str("<content>");
-        out.push_str(&entry.content);
+        out.push_str(&xml_escape(&entry.content));
         out.push_str("</content>");
         if let Some(meta) = &entry.metadata {
             out.push_str("<metadata>");
             if let Ok(json) = serde_json::to_string(meta) {
-                out.push_str(&json);
+                out.push_str(&xml_escape(&json));
             }
             out.push_str("</metadata>");
         }

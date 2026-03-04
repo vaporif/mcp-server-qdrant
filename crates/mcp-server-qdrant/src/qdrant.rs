@@ -27,7 +27,6 @@ pub struct QdrantConnector {
 }
 
 impl QdrantConnector {
-    #[allow(clippy::result_large_err)]
     pub fn new(config: &QdrantConfig, embedding: Arc<dyn EmbeddingProvider>) -> Result<Self> {
         let client = match &config.location {
             QdrantLocation::Remote { url, api_key } => {
@@ -35,14 +34,16 @@ impl QdrantConnector {
                 if let Some(key) = api_key {
                     builder = builder.api_key(key.as_str());
                 }
-                builder.build().map_err(Error::Qdrant)?
+                builder.build().map_err(|e| Error::Qdrant(Box::new(e)))?
             }
             QdrantLocation::Local { path } => {
                 let url = "http://localhost:6334";
                 tracing::warn!(
                     "Local path {path:?} specified but qdrant-client only supports remote. Connecting to {url}"
                 );
-                Qdrant::from_url(url).build().map_err(Error::Qdrant)?
+                Qdrant::from_url(url)
+                    .build()
+                    .map_err(|e| Error::Qdrant(Box::new(e)))?
             }
         };
 
@@ -88,11 +89,7 @@ impl QdrantConnector {
     pub async fn store(&self, entry: Entry, collection_name: &str) -> Result<()> {
         self.ensure_collection(collection_name).await?;
 
-        let vector = self
-            .embedding
-            .embed(&entry.content)
-            .await
-            .map_err(|e| Error::Embedding(e.to_string()))?;
+        let vector = self.embedding.embed(&entry.content).await?;
 
         let mut payload = Payload::new();
         payload.insert("document", entry.content.as_str());
@@ -127,11 +124,7 @@ impl QdrantConnector {
     ) -> Result<Vec<Entry>> {
         self.ensure_collection(collection_name).await?;
 
-        let vector = self
-            .embedding
-            .embed(query)
-            .await
-            .map_err(|e| Error::Embedding(e.to_string()))?;
+        let vector = self.embedding.embed(query).await?;
 
         let mut request = QueryPointsBuilder::new(collection_name)
             .query(qdrant_client::qdrant::Query::new_nearest(vector))
@@ -187,7 +180,6 @@ impl QdrantConnector {
 pub fn json_to_qdrant_filter(value: &serde_json::Value) -> Result<Filter> {
     use qdrant_client::qdrant::Condition;
 
-    #[allow(clippy::result_large_err)]
     fn parse_condition(c: &serde_json::Value) -> Result<Condition> {
         let key = c
             .get("key")
@@ -212,7 +204,6 @@ pub fn json_to_qdrant_filter(value: &serde_json::Value) -> Result<Filter> {
         )))
     }
 
-    #[allow(clippy::result_large_err)]
     fn parse_conditions(arr: &[serde_json::Value]) -> Result<Vec<Condition>> {
         arr.iter().map(parse_condition).collect()
     }

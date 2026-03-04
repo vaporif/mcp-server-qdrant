@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
@@ -6,8 +8,13 @@ use hf_hub::api::sync::Api;
 use tokenizers::Tokenizer;
 
 use super::EmbeddingProvider;
+use crate::errors::{Error, Result};
 
 pub struct CandleEmbedder {
+    inner: Arc<CandleInner>,
+}
+
+struct CandleInner {
     model: BertModel,
     tokenizer: Tokenizer,
     device: Device,
@@ -15,34 +22,52 @@ pub struct CandleEmbedder {
 }
 
 impl CandleEmbedder {
-    pub fn new(model_name: &str) -> anyhow::Result<Self> {
+    pub fn new(model_name: &str) -> Result<Self> {
         let device = Device::Cpu;
 
-        let repo = Api::new()?.model(model_name.to_string());
+        let repo = Api::new()
+            .map_err(|e| Error::ModelDownload(e.to_string()))?
+            .model(model_name.to_string());
 
-        let config_path = repo.get("config.json")?;
-        let tokenizer_path = repo.get("tokenizer.json")?;
-        let weights_path = repo.get("model.safetensors")?;
+        let config_path = repo
+            .get("config.json")
+            .map_err(|e| Error::ModelDownload(e.to_string()))?;
+        let tokenizer_path = repo
+            .get("tokenizer.json")
+            .map_err(|e| Error::ModelDownload(e.to_string()))?;
+        let weights_path = repo
+            .get("model.safetensors")
+            .map_err(|e| Error::ModelDownload(e.to_string()))?;
 
-        let config: Config = serde_json::from_str(&std::fs::read_to_string(&config_path)?)?;
+        let config: Config = serde_json::from_str(
+            &std::fs::read_to_string(&config_path)
+                .map_err(|e| Error::ModelDownload(e.to_string()))?,
+        )
+        .map_err(|e| Error::ModelDownload(e.to_string()))?;
         let dimension = config.hidden_size;
 
-        let tokenizer = Tokenizer::from_file(&tokenizer_path)
-            .map_err(|e| anyhow::anyhow!("failed to load tokenizer: {e}"))?;
+        let tokenizer =
+            Tokenizer::from_file(&tokenizer_path).map_err(|e| Error::Tokenizer(e.to_string()))?;
 
-        let vb =
-            unsafe { VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)? };
-        let model = BertModel::load(vb, &config)?;
+        let vb = unsafe {
+            VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)
+                .map_err(|e| Error::Embedding(e.to_string()))?
+        };
+        let model = BertModel::load(vb, &config).map_err(|e| Error::Embedding(e.to_string()))?;
 
         Ok(Self {
-            model,
-            tokenizer,
-            device,
-            dimension,
+            inner: Arc::new(CandleInner {
+                model,
+                tokenizer,
+                device,
+                dimension,
+            }),
         })
     }
+}
 
-    fn embed_sync(&self, texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
+impl CandleInner {
+    fn embed_sync(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
         if texts.is_empty() {
             return Ok(vec![]);
         }
@@ -50,7 +75,7 @@ impl CandleEmbedder {
         let encodings = self
             .tokenizer
             .encode_batch(texts.to_vec(), true)
-            .map_err(|e| anyhow::anyhow!("tokenization failed: {e}"))?;
+            .map_err(|e| Error::Tokenizer(e.to_string()))?;
 
         let batch_size = encodings.len();
         let max_len = encodings
@@ -74,51 +99,88 @@ impl CandleEmbedder {
             attention_mask[offset..offset + seq_len].copy_from_slice(mask);
         }
 
-        let input_ids = Tensor::from_vec(input_ids, (batch_size, max_len), &self.device)?;
-        let type_ids = Tensor::from_vec(type_ids, (batch_size, max_len), &self.device)?;
+        let input_ids = Tensor::from_vec(input_ids, (batch_size, max_len), &self.device)
+            .map_err(|e| Error::Embedding(e.to_string()))?;
+        let type_ids = Tensor::from_vec(type_ids, (batch_size, max_len), &self.device)
+            .map_err(|e| Error::Embedding(e.to_string()))?;
         let attention_mask_tensor =
-            Tensor::from_vec(attention_mask, (batch_size, max_len), &self.device)?;
+            Tensor::from_vec(attention_mask, (batch_size, max_len), &self.device)
+                .map_err(|e| Error::Embedding(e.to_string()))?;
 
         let output = self
             .model
-            .forward(&input_ids, &type_ids, Some(&attention_mask_tensor))?;
+            .forward(&input_ids, &type_ids, Some(&attention_mask_tensor))
+            .map_err(|e| Error::Embedding(e.to_string()))?;
 
         // Mean pooling with attention mask
-        let mask_f32 = attention_mask_tensor.to_dtype(DType::F32)?;
-        let mask_expanded = mask_f32.unsqueeze(2)?; // (batch, seq, 1)
-        let masked_output = output.broadcast_mul(&mask_expanded)?;
-        let summed = masked_output.sum(1)?; // (batch, hidden)
-        let mask_sum = mask_expanded.sum(1)?.clamp(1e-9, f64::MAX)?; // (batch, 1)
-        let mean_pooled = summed.broadcast_div(&mask_sum)?; // (batch, hidden)
+        let mask_f32 = attention_mask_tensor
+            .to_dtype(DType::F32)
+            .map_err(|e| Error::Embedding(e.to_string()))?;
+        let mask_expanded = mask_f32
+            .unsqueeze(2)
+            .map_err(|e| Error::Embedding(e.to_string()))?;
+        let masked_output = output
+            .broadcast_mul(&mask_expanded)
+            .map_err(|e| Error::Embedding(e.to_string()))?;
+        let summed = masked_output
+            .sum(1)
+            .map_err(|e| Error::Embedding(e.to_string()))?;
+        let mask_sum = mask_expanded
+            .sum(1)
+            .and_then(|t| t.clamp(1e-9, f64::MAX))
+            .map_err(|e| Error::Embedding(e.to_string()))?;
+        let mean_pooled = summed
+            .broadcast_div(&mask_sum)
+            .map_err(|e| Error::Embedding(e.to_string()))?;
 
         // L2 normalization
         let norms = mean_pooled
-            .sqr()?
-            .sum_keepdim(1)?
-            .sqrt()?
-            .clamp(1e-12, f64::MAX)?;
-        let normalized = mean_pooled.broadcast_div(&norms)?;
+            .sqr()
+            .and_then(|t| t.sum_keepdim(1))
+            .and_then(|t| t.sqrt())
+            .and_then(|t| t.clamp(1e-12, f64::MAX))
+            .map_err(|e| Error::Embedding(e.to_string()))?;
+        let normalized = mean_pooled
+            .broadcast_div(&norms)
+            .map_err(|e| Error::Embedding(e.to_string()))?;
 
-        let normalized = normalized.to_vec2::<f32>()?;
-        Ok(normalized)
+        normalized
+            .to_vec2::<f32>()
+            .map_err(|e| Error::Embedding(e.to_string()))
     }
 }
 
+// Safety: BertModel uses CPU tensors only (no GPU pointers), Tokenizer is thread-safe.
+unsafe impl Send for CandleInner {}
+unsafe impl Sync for CandleInner {}
+
 #[async_trait]
 impl EmbeddingProvider for CandleEmbedder {
-    async fn embed(&self, text: &str) -> anyhow::Result<Vec<f32>> {
-        let texts = vec![text.to_string()];
-        let mut results = self.embed_sync(&texts)?;
-        results
-            .pop()
-            .ok_or_else(|| anyhow::anyhow!("empty embedding result"))
+    async fn embed(&self, text: &str) -> Result<Vec<f32>> {
+        let inner = self.inner.clone();
+        let text = text.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            let texts = vec![text];
+            let mut results = inner.embed_sync(&texts)?;
+            results
+                .pop()
+                .ok_or_else(|| Error::Embedding("empty embedding result".into()))
+        })
+        .await
+        .map_err(|e| Error::Embedding(format!("spawn_blocking join: {e}")))?
     }
 
-    async fn embed_batch(&self, texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
-        self.embed_sync(texts)
+    async fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        let inner = self.inner.clone();
+        let texts = texts.to_vec();
+
+        tokio::task::spawn_blocking(move || inner.embed_sync(&texts))
+            .await
+            .map_err(|e| Error::Embedding(format!("spawn_blocking join: {e}")))?
     }
 
     fn dimension(&self) -> usize {
-        self.dimension
+        self.inner.dimension
     }
 }
