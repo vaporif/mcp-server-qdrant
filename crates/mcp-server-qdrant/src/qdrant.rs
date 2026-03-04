@@ -97,12 +97,13 @@ impl QdrantConnector {
         let mut payload = Payload::new();
         payload.insert("document", entry.content.as_str());
         if let Some(metadata) = &entry.metadata {
+            let mut map = serde_json::Map::new();
             for (key, value) in metadata {
-                let obj = serde_json::json!({ key: value });
-                if let Ok(p) = Payload::try_from(obj) {
-                    for (k, v) in HashMap::<String, qdrant_client::qdrant::Value>::from(p) {
-                        payload.insert(k, v);
-                    }
+                map.insert(key.clone(), value.clone());
+            }
+            if let Ok(p) = Payload::try_from(serde_json::Value::Object(map)) {
+                for (k, v) in HashMap::<String, qdrant_client::qdrant::Value>::from(p) {
+                    payload.insert(k, v);
                 }
             }
         }
@@ -168,6 +169,67 @@ impl QdrantConnector {
 
         Ok(entries)
     }
+}
+
+/// Convert a JSON value to a Qdrant Filter.
+///
+/// Expects the Qdrant REST API filter format, e.g.:
+/// ```json
+/// { "must": [{ "key": "city", "match": { "value": "London" } }] }
+/// ```
+/// Convert a JSON value to a Qdrant Filter.
+///
+/// Expects the Qdrant REST API filter format, e.g.:
+/// ```json
+/// { "must": [{ "key": "city", "match": { "value": "London" } }] }
+/// ```
+#[allow(clippy::result_large_err)]
+pub fn json_to_qdrant_filter(value: &serde_json::Value) -> Result<Filter> {
+    use qdrant_client::qdrant::Condition;
+
+    #[allow(clippy::result_large_err)]
+    fn parse_condition(c: &serde_json::Value) -> Result<Condition> {
+        let key = c
+            .get("key")
+            .and_then(|k| k.as_str())
+            .ok_or(Error::Config("filter condition missing 'key'".into()))?;
+
+        if let Some(match_obj) = c.get("match") {
+            if let Some(s) = match_obj.get("value").and_then(serde_json::Value::as_str) {
+                return Ok(Condition::matches(key, s.to_string()));
+            }
+            if let Some(n) = match_obj.get("value").and_then(serde_json::Value::as_i64) {
+                return Ok(Condition::matches(key, n));
+            }
+            if let Some(b) = match_obj.get("value").and_then(serde_json::Value::as_bool) {
+                return Ok(Condition::matches(key, b));
+            }
+            return Err(Error::Config("unsupported match value type".into()));
+        }
+
+        Err(Error::Config(format!(
+            "unsupported filter condition for key '{key}'"
+        )))
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn parse_conditions(arr: &[serde_json::Value]) -> Result<Vec<Condition>> {
+        arr.iter().map(parse_condition).collect()
+    }
+
+    let mut filter = Filter::default();
+
+    if let Some(must) = value.get("must").and_then(|v| v.as_array()) {
+        filter.must = parse_conditions(must)?;
+    }
+    if let Some(should) = value.get("should").and_then(|v| v.as_array()) {
+        filter.should = parse_conditions(should)?;
+    }
+    if let Some(must_not) = value.get("must_not").and_then(|v| v.as_array()) {
+        filter.must_not = parse_conditions(must_not)?;
+    }
+
+    Ok(filter)
 }
 
 fn extract_string(

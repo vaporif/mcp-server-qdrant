@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use rmcp::handler::server::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{
-    CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo,
-};
+use rmcp::model::{CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo};
 use rmcp::{ErrorData as McpError, ServerHandler, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -32,6 +30,9 @@ pub struct FindParams {
     /// Collection name (uses default if not provided)
     #[serde(default)]
     pub collection_name: Option<String>,
+    /// Optional Qdrant filter as JSON
+    #[serde(default)]
+    pub query_filter: Option<Value>,
 }
 
 #[derive(Clone)]
@@ -118,13 +119,26 @@ impl QdrantMcpServer {
     ) -> Result<CallToolResult, McpError> {
         let collection = self.resolve_collection(params.collection_name.as_ref())?;
 
+        if params.query_filter.is_some() && !self.config.qdrant.allow_arbitrary_filter {
+            return Err(McpError::invalid_params(
+                "arbitrary filters are disabled — set QDRANT_ALLOW_ARBITRARY_FILTER=true to enable",
+                None,
+            ));
+        }
+
+        let filter = params
+            .query_filter
+            .map(|f| crate::qdrant::json_to_qdrant_filter(&f))
+            .transpose()
+            .map_err(|e| McpError::invalid_params(format!("invalid filter: {e}"), None))?;
+
         let entries = self
             .connector
             .search(
                 &params.query,
                 &collection,
                 self.config.qdrant.search_limit,
-                None,
+                filter,
             )
             .await
             .map_err(|e| McpError::internal_error(format!("search failed: {e}"), None))?;
@@ -143,11 +157,9 @@ impl QdrantMcpServer {
 #[tool_handler]
 impl ServerHandler for QdrantMcpServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
-            .with_server_info(Implementation::new(
-                "mcp-server-qdrant",
-                env!("CARGO_PKG_VERSION"),
-            ))
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_server_info(
+            Implementation::new("mcp-server-qdrant", env!("CARGO_PKG_VERSION")),
+        )
     }
 }
 

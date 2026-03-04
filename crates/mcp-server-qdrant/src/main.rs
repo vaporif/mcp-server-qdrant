@@ -20,7 +20,10 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let config = Config::from_cli(cli)?;
 
-    tracing::info!("creating embedding provider: {}", config.embedding.model_name);
+    tracing::info!(
+        "creating embedding provider: {}",
+        config.embedding.model_name
+    );
     let embedding = Arc::from(create_embedding_provider(&config.embedding.model_name)?);
 
     tracing::info!("connecting to Qdrant");
