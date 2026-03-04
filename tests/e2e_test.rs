@@ -25,18 +25,22 @@ fn unique_collection() -> String {
 
 struct CollectionGuard {
     name: String,
-    rt: tokio::runtime::Handle,
 }
 
 impl Drop for CollectionGuard {
     fn drop(&mut self) {
         let name = self.name.clone();
-        let _ = self.rt.block_on(async {
-            let client = Qdrant::from_url("http://localhost:6334")
-                .build()
-                .expect("qdrant client");
-            client.delete_collection(&name).await
-        });
+        // Spawn a separate thread with its own runtime to avoid
+        // "cannot block_on inside a runtime" panic.
+        let _ = std::thread::spawn(move || {
+            tokio::runtime::Runtime::new().unwrap().block_on(async {
+                let client = Qdrant::from_url("http://localhost:6334")
+                    .build()
+                    .expect("qdrant client");
+                let _ = client.delete_collection(&name).await;
+            });
+        })
+        .join();
     }
 }
 
@@ -46,7 +50,6 @@ async fn store_and_search_basic() {
     let collection = unique_collection();
     let _guard = CollectionGuard {
         name: collection.clone(),
-        rt: tokio::runtime::Handle::current(),
     };
 
     let config = qdrant_config(&collection);
@@ -83,7 +86,6 @@ async fn store_with_metadata_and_search() {
     let collection = unique_collection();
     let _guard = CollectionGuard {
         name: collection.clone(),
-        rt: tokio::runtime::Handle::current(),
     };
 
     let config = qdrant_config(&collection);
@@ -128,7 +130,6 @@ async fn search_returns_empty_for_unrelated_query() {
     let collection = unique_collection();
     let _guard = CollectionGuard {
         name: collection.clone(),
-        rt: tokio::runtime::Handle::current(),
     };
 
     let config = qdrant_config(&collection);
