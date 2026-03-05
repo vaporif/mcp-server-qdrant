@@ -82,4 +82,4 @@ just e2e       # e2e tests (needs Qdrant)
 
 ## License
 
-Apache-2.0
+MIT
