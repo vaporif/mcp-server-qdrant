@@ -1,0 +1,70 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required: []
+    properties:
+      qdrantUrl:
+        type: string
+        description: "Qdrant server URL (e.g. http://localhost:6334). Mutually exclusive with qdrantLocalPath."
+      qdrantApiKey:
+        type: string
+        description: "Qdrant API key for authentication."
+      qdrantLocalPath:
+        type: string
+        description: "Local Qdrant storage path. Mutually exclusive with qdrantUrl."
+      collectionName:
+        type: string
+        description: "Default Qdrant collection name."
+      qdrantSearchLimit:
+        type: number
+        default: 10
+        description: "Maximum number of search results to return."
+      qdrantReadOnly:
+        type: boolean
+        default: false
+        description: "Read-only mode (disables the store tool)."
+      embeddingModel:
+        type: string
+        default: "sentence-transformers/all-MiniLM-L6-v2"
+        description: "HuggingFace embedding model name."
+      toolStoreDescription:
+        type: string
+        description: "Custom description for the store tool."
+      toolFindDescription:
+        type: string
+        description: "Custom description for the find tool."
+      filterableFields:
+        type: string
+        description: "JSON array of filterable field definitions."
+      qdrantAllowArbitraryFilter:
+        type: boolean
+        default: false
+        description: "Allow arbitrary Qdrant filter syntax."
+  commandFunction:
+    |-
+    (config) => {
+      const env = {};
+      if (config.qdrantUrl) env.QDRANT_URL = config.qdrantUrl;
+      if (config.qdrantApiKey) env.QDRANT_API_KEY = config.qdrantApiKey;
+      if (config.qdrantLocalPath) env.QDRANT_LOCAL_PATH = config.qdrantLocalPath;
+      if (config.collectionName) env.COLLECTION_NAME = config.collectionName;
+      if (config.qdrantSearchLimit !== undefined) env.QDRANT_SEARCH_LIMIT = String(config.qdrantSearchLimit);
+      if (config.qdrantReadOnly) env.QDRANT_READ_ONLY = String(config.qdrantReadOnly);
+      if (config.embeddingModel) env.EMBEDDING_MODEL = config.embeddingModel;
+      if (config.toolStoreDescription) env.TOOL_STORE_DESCRIPTION = config.toolStoreDescription;
+      if (config.toolFindDescription) env.TOOL_FIND_DESCRIPTION = config.toolFindDescription;
+      if (config.filterableFields) env.FILTERABLE_FIELDS = config.filterableFields;
+      if (config.qdrantAllowArbitraryFilter) env.QDRANT_ALLOW_ARBITRARY_FILTER = String(config.qdrantAllowArbitraryFilter);
+      env.MCP_TRANSPORT = "stdio";
+      return {
+        command: "mcp-server-qdrant",
+        args: [],
+        env: env
+      };
+    }
+  exampleConfig:
+    qdrantUrl: "http://localhost:6334"
+    collectionName: "my-collection"
