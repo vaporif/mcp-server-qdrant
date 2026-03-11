@@ -48,7 +48,7 @@ As a flake input:
 }
 ```
 
-Or with [rvx](https://github.com/vaporif/rvx?tab=readme-ov-file#install) (no Rust toolchain needed):
+Or with [rvx](https://github.com/vaporif/rvx?tab=readme-ov-file#install) (no Rust toolchain needed and no installation required):
 
 ```json
 {
