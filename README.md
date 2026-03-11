@@ -48,6 +48,22 @@ As a flake input:
 }
 ```
 
+Or with [rvx](https://github.com/vaporif/rvx?tab=readme-ov-file#install) (no Rust toolchain needed):
+
+```json
+{
+  "mcpServers": {
+    "qdrant": {
+      "command": "rvx mcp-server-qdrant",
+      "env": {
+        "QDRANT_URL": "http://localhost:6334",
+        "COLLECTION_NAME": "my-collection"
+      }
+    }
+  }
+}
+```
+
 ### Environment Variables
 
 | Variable | Default | Description |
