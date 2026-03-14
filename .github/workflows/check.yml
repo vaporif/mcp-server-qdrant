@@ -148,16 +148,6 @@ jobs:
       - name: Nix flake check
         run: nix flake check
 
-  audit:
-    name: Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
   deny:
     name: Deny
     runs-on: ubuntu-latest

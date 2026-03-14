@@ -7,12 +7,12 @@ name = "mcp-server-qdrant"
 dynamic = ["version"]
 description = "MCP server for Qdrant vector database with local embedding support"
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 requires-python = ">=3.8"
 keywords = ["mcp", "qdrant", "embeddings", "vector-database"]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Rust",
 ]
 

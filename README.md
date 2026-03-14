@@ -80,6 +80,7 @@ Download a prebuilt binary from [GitHub Releases](https://github.com/vaporif/mcp
 **With Docker:**
 
 ```sh
+docker build -t mcp-server-qdrant .
 docker run -p 8000:8000 -e QDRANT_URL=http://host.docker.internal:6334 -e COLLECTION_NAME=my-collection mcp-server-qdrant
 ```
 
