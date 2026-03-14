@@ -19,7 +19,7 @@ ONNX Python wheels are painful to package in Nix (especially aarch64-linux). Thi
   "mcpServers": {
     "qdrant": {
       "command": "uvx",
-      "args": ["mcp-server-qdrant"],
+      "args": ["mcp-server-qdrant-rs"],
       "env": {
         "QDRANT_URL": "http://localhost:6334",
         "COLLECTION_NAME": "my-collection"

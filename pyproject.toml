@@ -3,7 +3,7 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "mcp-server-qdrant"
+name = "mcp-server-qdrant-rs"
 dynamic = ["version"]
 description = "MCP server for Qdrant vector database with local embedding support"
 readme = "README.md"
