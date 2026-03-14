@@ -60,8 +60,8 @@ startCommand:
       if (config.qdrantAllowArbitraryFilter) env.QDRANT_ALLOW_ARBITRARY_FILTER = String(config.qdrantAllowArbitraryFilter);
       env.MCP_TRANSPORT = "stdio";
       return {
-        command: "mcp-server-qdrant",
-        args: [],
+        command: "uvx",
+        args: ["mcp-server-qdrant"],
         env: env
       };
     }
