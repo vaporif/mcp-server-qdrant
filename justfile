@@ -40,6 +40,20 @@ lint-actions:
 fmt:
     cargo fmt --all
 
+# Run all checks (CI equivalent)
+[group('lint')]
+check:
+    cargo clippy --workspace -- -D warnings
+    cargo test --workspace
+    cargo fmt --all -- --check
+    taplo check
+    typos
+
+# Audit dependencies
+[group('lint')]
+deny:
+    cargo deny check
+
 # Clean build artifacts
 [group('clean')]
 clean:
