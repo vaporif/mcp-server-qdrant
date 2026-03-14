@@ -8,13 +8,50 @@ Rust MCP server for Qdrant with local BERT embeddings. Single binary, no Python.
 
 ONNX Python wheels are painful to package in Nix (especially aarch64-linux). This is a Rust rewrite with Nix-native packaging and a pure-Rust default backend (Candle) that has zero native dependencies.
 
-## Install
+## Usage
 
-```bash
-cargo install --path .
+### Claude Desktop / Claude Code
+
+**With [uvx](https://docs.astral.sh/uv/) (recommended):**
+
+```json
+{
+  "mcpServers": {
+    "qdrant": {
+      "command": "uvx",
+      "args": ["mcp-server-qdrant"],
+      "env": {
+        "QDRANT_URL": "http://localhost:6334",
+        "COLLECTION_NAME": "my-collection"
+      }
+    }
+  }
+}
 ```
 
-```bash
+**With [rvx](https://github.com/vaporif/rvx):**
+
+```json
+{
+  "mcpServers": {
+    "qdrant": {
+      "command": "rvx",
+      "args": ["mcp-server-qdrant"],
+      "env": {
+        "QDRANT_URL": "http://localhost:6334",
+        "COLLECTION_NAME": "my-collection"
+      }
+    }
+  }
+}
+```
+
+<details>
+<summary>Other installation methods</summary>
+
+**With Nix:**
+
+```sh
 nix run github:vaporif/mcp-server-qdrant
 
 # ONNX backend
@@ -26,42 +63,38 @@ As a flake input:
 ```nix
 {
   inputs.mcp-server-qdrant.url = "github:vaporif/mcp-server-qdrant";
-
-  # use the overlay
   nixpkgs.overlays = [ mcp-server-qdrant.overlays.default ];
 }
 ```
 
-## Usage
+**With cargo:**
 
-```json
-{
-  "mcpServers": {
-    "qdrant": {
-      "command": "mcp-server-qdrant",
-      "env": {
-        "QDRANT_URL": "http://localhost:6334",
-        "COLLECTION_NAME": "my-collection"
-      }
-    }
-  }
-}
+```sh
+cargo install mcp-server-qdrant
 ```
 
-Or with [rvx](https://github.com/vaporif/rvx?tab=readme-ov-file#install) (no Rust toolchain needed and no installation required):
+**From releases:**
 
-```json
-{
-  "mcpServers": {
-    "qdrant": {
-      "command": "rvx mcp-server-qdrant",
-      "env": {
-        "QDRANT_URL": "http://localhost:6334",
-        "COLLECTION_NAME": "my-collection"
-      }
-    }
-  }
-}
+Download a prebuilt binary from [GitHub Releases](https://github.com/vaporif/mcp-server-qdrant/releases).
+
+**With Docker:**
+
+```sh
+docker run -p 8000:8000 -e QDRANT_URL=http://host.docker.internal:6334 -e COLLECTION_NAME=my-collection mcp-server-qdrant
+```
+
+</details>
+
+### HTTP Transport
+
+```sh
+mcp-server-qdrant --transport streamable-http --port 8000
+```
+
+### Debugging
+
+```sh
+RUST_LOG=debug mcp-server-qdrant
 ```
 
 ### Environment Variables
@@ -89,10 +122,12 @@ Or with [rvx](https://github.com/vaporif/rvx?tab=readme-ov-file#install) (no Rus
 
 ## Development
 
-```bash
+```sh
 nix develop    # dev shell
+just check     # clippy + test + fmt + taplo + typos
 just test      # run tests
 just lint      # clippy + fmt
+just deny      # dependency audit
 just e2e       # e2e tests (needs Qdrant)
 ```
 
