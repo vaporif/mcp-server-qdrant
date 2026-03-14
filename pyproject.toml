@@ -1,0 +1,23 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "mcp-server-qdrant"
+dynamic = ["version"]
+description = "MCP server for Qdrant vector database with local embedding support"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+keywords = ["mcp", "qdrant", "embeddings", "vector-database"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Rust",
+]
+
+[project.urls]
+Repository = "https://github.com/vaporif/mcp-server-qdrant"
+
+[tool.maturin]
+bindings = "bin"
