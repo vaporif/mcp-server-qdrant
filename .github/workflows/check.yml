@@ -50,8 +50,12 @@ jobs:
           args: --release --out dist
 
   e2e:
-    name: E2E
+    name: E2E (${{ matrix.backend }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [onnx-fetch, candle]
     services:
       qdrant:
         image: qdrant/qdrant:latest
@@ -64,20 +68,29 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: e2e-${{ matrix.backend }}
 
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
 
       - name: E2E tests
-        run: cargo nextest run --profile ci --run-ignored ignored-only
+        run: cargo nextest run --profile ci --run-ignored ignored-only --no-default-features --features ${{ matrix.backend }}
 
   cross:
-    name: Cross ${{ matrix.target }}
+    name: Cross ${{ matrix.target }} (${{ matrix.backend }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        target:
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-musl
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+          - x86_64-pc-windows-msvc
+        backend: [candle, onnx-fetch]
         include:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
@@ -89,6 +102,11 @@ jobs:
             os: macos-latest
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+        exclude:
+          - target: x86_64-unknown-linux-musl
+            backend: onnx-fetch
+          - target: aarch64-unknown-linux-musl
+            backend: onnx-fetch
     steps:
       - uses: actions/checkout@v6
 
@@ -98,14 +116,14 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.target }}
+          key: ${{ matrix.target }}-${{ matrix.backend }}
 
       - uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --no-default-features --target ${{ matrix.target }}
+        run: cargo build --no-default-features --features ${{ matrix.backend }} --target ${{ matrix.target }}
 
   lint:
     name: Lint

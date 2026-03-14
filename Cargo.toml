@@ -28,10 +28,12 @@ multiple_crate_versions = "allow"
 significant_drop_tightening = "allow"
 
 [features]
-default = ["candle"]
+default = ["onnx-fetch"]
 candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers"]
-onnx = ["dep:ort", "dep:ndarray"]
-onnx-fetch = ["onnx"]
+# ONNX with runtime dylib loading (user provides ORT_DYLIB_PATH)
+onnx = ["dep:ort", "dep:ndarray", "ort/load-dynamic"]
+# ONNX with auto-download of runtime (self-contained, larger binary)
+onnx-fetch = ["dep:ort", "dep:ndarray", "ort/download-binaries", "ort/copy-dylibs", "ort/tls-native"]
 
 [dependencies]
 rmcp = { version = "1.1", features = ["server", "transport-io", "transport-streamable-http-server"] }
@@ -47,7 +49,7 @@ candle-nn = { version = "0.9", optional = true }
 candle-transformers = { version = "0.9", optional = true }
 
 # Embeddings (onnx)
-ort = { version = "2.0.0-rc.11", optional = true }
+ort = { version = "=2.0.0-rc.11", default-features = false, features = ["std", "ndarray"], optional = true }
 ndarray = { version = "0.17", optional = true }
 
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }

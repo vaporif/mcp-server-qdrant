@@ -61,29 +61,41 @@
         "aarch64-linux"
         "aarch64-darwin"
       ];
+      ext = pkgs.stdenv.hostPlatform.extensions.sharedLibrary;
     in
       {
-        default = craneLib.buildPackage (commonArgs // {inherit cargoArtifacts meta;});
+        candle = craneLib.buildPackage (commonArgs
+          // {
+            inherit cargoArtifacts meta;
+            cargoExtraArgs = "--no-default-features --features candle";
+          });
       }
       // pkgs.lib.optionalAttrs onnxSupported {
-        onnx = let
+        default = let
           unwrapped = craneLib.buildPackage (commonArgs
             // {
               inherit cargoArtifacts meta;
               cargoExtraArgs = "--no-default-features --features onnx";
-              ORT_DYLIB_PATH = "${onnxruntime-bin}/lib/libonnxruntime${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}";
+              ORT_DYLIB_PATH = "${onnxruntime-bin}/lib/libonnxruntime${ext}";
             });
         in
           pkgs.symlinkJoin {
-            name = "mcp-server-qdrant-onnx";
+            name = "mcp-server-qdrant";
             paths = [unwrapped];
             nativeBuildInputs = [pkgs.makeWrapper];
             postBuild = ''
               wrapProgram $out/bin/mcp-server-qdrant \
-                --set ORT_DYLIB_PATH "${onnxruntime-bin}/lib/libonnxruntime${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}"
+                --set ORT_DYLIB_PATH "${onnxruntime-bin}/lib/libonnxruntime${ext}"
             '';
             inherit meta;
           };
+      }
+      // pkgs.lib.optionalAttrs (!onnxSupported) {
+        default = craneLib.buildPackage (commonArgs
+          // {
+            inherit cargoArtifacts meta;
+            cargoExtraArgs = "--no-default-features --features candle";
+          });
       });
 
     devShells = forAllSystems ({

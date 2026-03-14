@@ -20,13 +20,13 @@ All commands use `just` (task runner). Run `just` to see available tasks.
 
 ### Feature flags
 
-- `candle` (default) — candle-based BERT embedding backend
-- `onnx` — ONNX Runtime embedding backend
-- `onnx-fetch` — ONNX backend with model auto-download
+- `onnx-fetch` (default) — ONNX Runtime with auto-download of runtime binaries
+- `onnx` — ONNX Runtime with user-provided `ORT_DYLIB_PATH`
+- `candle` — Pure Rust candle-based BERT embedding backend (no native deps)
 
-Build with ONNX instead of candle:
+Build with candle instead of ONNX:
 ```bash
-cargo build --no-default-features --features onnx
+cargo build --no-default-features --features candle
 ```
 
 ## Architecture

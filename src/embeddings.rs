@@ -23,14 +23,14 @@ mod onnx_backend;
 pub use onnx_backend::OnnxEmbedder;
 
 pub async fn create_embedding_provider(model_name: &str) -> Result<Box<dyn EmbeddingProvider>> {
-    #[cfg(feature = "candle")]
-    {
-        return Ok(Box::new(CandleEmbedder::new(model_name).await?));
-    }
-
-    #[cfg(all(any(feature = "onnx", feature = "onnx-fetch"), not(feature = "candle")))]
+    #[cfg(any(feature = "onnx", feature = "onnx-fetch"))]
     {
         return Ok(Box::new(OnnxEmbedder::new(model_name).await?));
+    }
+
+    #[cfg(all(feature = "candle", not(any(feature = "onnx", feature = "onnx-fetch"))))]
+    {
+        return Ok(Box::new(CandleEmbedder::new(model_name).await?));
     }
 
     #[allow(unreachable_code)]
