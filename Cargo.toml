@@ -1,6 +1,6 @@
 [package]
 name = "mcp-server-qdrant"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "MCP server for Qdrant vector database with local embedding support"
 license = "Apache-2.0"
@@ -34,13 +34,10 @@ onnx = ["dep:ort", "dep:ndarray"]
 onnx-fetch = ["onnx"]
 
 [dependencies]
-# MCP
 rmcp = { version = "1.1", features = ["server", "transport-io", "transport-streamable-http-server"] }
 
-# Qdrant
 qdrant-client = { version = "1", default-features = false, features = ["download_snapshots", "serde"] }
 
-# Embeddings (shared)
 tokenizers = { version = "0.22", default-features = false, features = ["onig"] }
 hf-hub = { version = "0.5", default-features = false, features = ["tokio", "rustls-tls"] }
 
@@ -53,29 +50,17 @@ candle-transformers = { version = "0.9", optional = true }
 ort = { version = "2.0.0-rc.11", optional = true }
 ndarray = { version = "0.17", optional = true }
 
-# Async
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
-
-# CLI
 clap = { version = "4", features = ["derive", "env"] }
-
-# Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 schemars = "1"
-
-# Error handling
 thiserror = "2"
 anyhow = "1"
-
-# Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# HTTP server
 axum = "0.8"
 tokio-util = "0.7"
 
-# Misc
 uuid = { version = "1", features = ["v4"] }
 async-trait = "0.1"

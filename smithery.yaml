@@ -1,20 +1,22 @@
 # Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
 
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
 startCommand:
-  type: stdio
+  type: "http"
   configSchema:
     type: object
-    required: []
+    required:
+      - qdrantUrl
     properties:
       qdrantUrl:
         type: string
-        description: "Qdrant server URL (e.g. http://localhost:6334). Mutually exclusive with qdrantLocalPath."
+        description: "Qdrant server URL (e.g. https://your-cluster.cloud.qdrant.io:6334)."
       qdrantApiKey:
         type: string
         description: "Qdrant API key for authentication."
-      qdrantLocalPath:
-        type: string
-        description: "Local Qdrant storage path. Mutually exclusive with qdrantUrl."
       collectionName:
         type: string
         description: "Default Qdrant collection name."
@@ -49,7 +51,6 @@ startCommand:
       const env = {};
       if (config.qdrantUrl) env.QDRANT_URL = config.qdrantUrl;
       if (config.qdrantApiKey) env.QDRANT_API_KEY = config.qdrantApiKey;
-      if (config.qdrantLocalPath) env.QDRANT_LOCAL_PATH = config.qdrantLocalPath;
       if (config.collectionName) env.COLLECTION_NAME = config.collectionName;
       if (config.qdrantSearchLimit !== undefined) env.QDRANT_SEARCH_LIMIT = String(config.qdrantSearchLimit);
       if (config.qdrantReadOnly) env.QDRANT_READ_ONLY = String(config.qdrantReadOnly);
@@ -58,13 +59,13 @@ startCommand:
       if (config.toolFindDescription) env.TOOL_FIND_DESCRIPTION = config.toolFindDescription;
       if (config.filterableFields) env.FILTERABLE_FIELDS = config.filterableFields;
       if (config.qdrantAllowArbitraryFilter) env.QDRANT_ALLOW_ARBITRARY_FILTER = String(config.qdrantAllowArbitraryFilter);
-      env.MCP_TRANSPORT = "stdio";
       return {
-        command: "uvx",
-        args: ["mcp-server-qdrant"],
+        command: "mcp-server-qdrant",
+        args: ["--transport", "streamable-http", "--host", "0.0.0.0"],
         env: env
       };
     }
   exampleConfig:
-    qdrantUrl: "http://localhost:6334"
+    qdrantUrl: "https://your-cluster.cloud.qdrant.io:6334"
+    qdrantApiKey: "your-api-key"
     collectionName: "my-collection"
