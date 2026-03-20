@@ -39,10 +39,18 @@
         inherit src;
         pname = "mcp-server-qdrant";
         strictDeps = true;
-        buildInputs = pkgs.lib.optionals pkgs.stdenv.isDarwin [
-          pkgs.libiconv
-          pkgs.apple-sdk_15
+        nativeBuildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [
+          pkgs.pkg-config
+          pkgs.openssl
         ];
+        buildInputs =
+          pkgs.lib.optionals pkgs.stdenv.isLinux [
+            pkgs.openssl
+          ]
+          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            pkgs.libiconv
+            pkgs.apple-sdk_15
+          ];
       };
       meta = {
         description = "Rust MCP server for Qdrant with local embeddings";
@@ -103,6 +111,33 @@
         "rust-src"
         "rust-analyzer"
       ];
+
+      # Extended toolchain for the dev shell — adds cross targets
+      devToolchain =
+        if pkgs.stdenv.isLinux
+        then
+          fenixPkgs.combine [
+            fenixPkgs.stable.cargo
+            fenixPkgs.stable.clippy
+            fenixPkgs.stable.rustc
+            fenixPkgs.stable.rustfmt
+            fenixPkgs.stable.rust-src
+            fenixPkgs.stable.rust-analyzer
+            fenixPkgs.targets."x86_64-unknown-linux-musl".stable.rust-std
+            fenixPkgs.targets."aarch64-unknown-linux-musl".stable.rust-std
+          ]
+        else if pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64
+        then
+          fenixPkgs.combine [
+            fenixPkgs.stable.cargo
+            fenixPkgs.stable.clippy
+            fenixPkgs.stable.rustc
+            fenixPkgs.stable.rustfmt
+            fenixPkgs.stable.rust-src
+            fenixPkgs.stable.rust-analyzer
+            fenixPkgs.targets."x86_64-apple-darwin".stable.rust-std
+          ]
+        else toolchain;
     in {
       packages =
         {candle = candlePkg;}
@@ -126,11 +161,6 @@
             // {
               cargoArtifacts = candleArtifacts;
               cargoClippyExtraArgs = "--workspace -- -D warnings";
-            });
-
-          candle-nextest = craneLib.cargoNextest (candleArgs
-            // {
-              cargoArtifacts = candleArtifacts;
             });
 
           taplo =
@@ -165,23 +195,26 @@
               cargoArtifacts = onnxArtifacts;
               cargoClippyExtraArgs = "--workspace -- -D warnings";
             });
-
-          onnx-nextest = craneLib.cargoNextest (onnxArgs
-            // {
-              cargoArtifacts = onnxArtifacts;
-            });
         };
 
       devShells.default = pkgs.mkShell {
         packages =
           [
-            toolchain
+            devToolchain
             pkgs.just
             pkgs.taplo
             pkgs.typos
             pkgs.actionlint
             pkgs.cargo-nextest
             pkgs.qdrant
+            pkgs.maturin
+            pkgs.python3
+          ]
+          ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+            pkgs.pkg-config
+            pkgs.openssl
+            pkgs.pkgsCross.musl64.stdenv.cc
+            pkgs.pkgsCross.aarch64-multiplatform-musl.stdenv.cc
           ]
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             pkgs.apple-sdk_15
@@ -190,7 +223,22 @@
         env =
           {
             RUST_BACKTRACE = "1";
-            RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
+            RUST_SRC_PATH = "${devToolchain}/lib/rustlib/src/rust/library";
+          }
+          // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [pkgs.openssl pkgs.stdenv.cc.cc.lib];
+            CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER = "${pkgs.pkgsCross.musl64.stdenv.cc}/bin/${pkgs.pkgsCross.musl64.stdenv.cc.targetPrefix}cc";
+            CC_x86_64_unknown_linux_musl = "${pkgs.pkgsCross.musl64.stdenv.cc}/bin/${pkgs.pkgsCross.musl64.stdenv.cc.targetPrefix}cc";
+            CFLAGS_x86_64_unknown_linux_musl = "-U_FORTIFY_SOURCE";
+            CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER = "${pkgs.pkgsCross.aarch64-multiplatform-musl.stdenv.cc}/bin/${pkgs.pkgsCross.aarch64-multiplatform-musl.stdenv.cc.targetPrefix}cc";
+            CC_aarch64_unknown_linux_musl = "${pkgs.pkgsCross.aarch64-multiplatform-musl.stdenv.cc}/bin/${pkgs.pkgsCross.aarch64-multiplatform-musl.stdenv.cc.targetPrefix}cc";
+            CFLAGS_aarch64_unknown_linux_musl = "-U_FORTIFY_SOURCE";
+            X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_STATIC = "1";
+            X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_LIB_DIR = "${pkgs.pkgsCross.musl64.openssl.out}/lib";
+            X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_INCLUDE_DIR = "${pkgs.pkgsCross.musl64.openssl.dev}/include";
+            AARCH64_UNKNOWN_LINUX_MUSL_OPENSSL_STATIC = "1";
+            AARCH64_UNKNOWN_LINUX_MUSL_OPENSSL_LIB_DIR = "${pkgs.pkgsCross.aarch64-multiplatform-musl.openssl.out}/lib";
+            AARCH64_UNKNOWN_LINUX_MUSL_OPENSSL_INCLUDE_DIR = "${pkgs.pkgsCross.aarch64-multiplatform-musl.openssl.dev}/include";
           }
           // pkgs.lib.optionalAttrs onnxSupported {
             ORT_DYLIB_PATH = onnxArgs.ORT_DYLIB_PATH;
