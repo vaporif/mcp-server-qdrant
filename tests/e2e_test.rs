@@ -72,7 +72,7 @@ fn default_config(qdrant: QdrantConfig) -> Config {
     }
 }
 
-fn json_args(v: serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
+fn json_args(v: &serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
     v.as_object().unwrap().clone()
 }
 
@@ -613,9 +613,27 @@ fn json_to_qdrant_filter_missing_key_errors() {
 }
 
 #[test]
-fn json_to_qdrant_filter_unsupported_condition_errors() {
-    let result = mcp_server_qdrant::qdrant::json_to_qdrant_filter(&serde_json::json!({
+fn json_to_qdrant_filter_range_condition() {
+    let filter = mcp_server_qdrant::qdrant::json_to_qdrant_filter(&serde_json::json!({
         "must": [{"key": "x", "range": {"gt": 5}}]
+    }))
+    .unwrap();
+    assert_eq!(filter.must.len(), 1);
+}
+
+#[test]
+fn json_to_qdrant_filter_range_gte_lte() {
+    let filter = mcp_server_qdrant::qdrant::json_to_qdrant_filter(&serde_json::json!({
+        "must": [{"key": "date", "range": {"gte": 1000, "lte": 2000}}]
+    }))
+    .unwrap();
+    assert_eq!(filter.must.len(), 1);
+}
+
+#[test]
+fn json_to_qdrant_filter_range_empty_errors() {
+    let result = mcp_server_qdrant::qdrant::json_to_qdrant_filter(&serde_json::json!({
+        "must": [{"key": "x", "range": {}}]
     }));
     assert!(result.is_err());
 }
@@ -744,7 +762,7 @@ fn make_filter_float_range_conditions() {
         }];
 
         let mut values = std::collections::HashMap::new();
-        values.insert("score".to_string(), serde_json::json!(3.14));
+        values.insert("score".to_string(), serde_json::json!(3.15));
 
         let filter = mcp_server_qdrant::filters::make_filter(&fields, &values).unwrap();
         assert_eq!(filter.must.len(), 1);
@@ -848,7 +866,7 @@ async fn mcp_store_returns_point_id() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "information": "Test document for point ID via MCP"
                 }),
             )),
@@ -877,7 +895,7 @@ async fn mcp_store_and_find() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "information": "Rust is a systems programming language"
                 }),
             )),
@@ -893,7 +911,7 @@ async fn mcp_store_and_find() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-find").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "query": "systems programming"
                 }),
             )),
@@ -923,7 +941,7 @@ async fn mcp_store_rejected_in_read_only_mode() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "information": "should fail"
                 }),
             )),
@@ -949,7 +967,7 @@ async fn mcp_find_no_collection_name_errors() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-find")
-                .with_arguments(json_args(serde_json::json!({"query": "test"}))),
+                .with_arguments(json_args(&serde_json::json!({"query": "test"}))),
         )
         .await;
 
@@ -972,7 +990,7 @@ async fn mcp_store_with_explicit_collection_name() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "information": "explicit collection test",
                     "collection_name": collection
                 }),
@@ -997,7 +1015,7 @@ async fn mcp_find_with_metadata_in_result() {
     client
         .call_tool(
             CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "information": "Paris is the capital of France",
                     "metadata": {"country": "France", "type": "capital"}
                 }),
@@ -1009,7 +1027,7 @@ async fn mcp_find_with_metadata_in_result() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-find")
-                .with_arguments(json_args(serde_json::json!({"query": "capital city"}))),
+                .with_arguments(json_args(&serde_json::json!({"query": "capital city"}))),
         )
         .await
         .unwrap();
@@ -1033,7 +1051,7 @@ async fn mcp_find_no_results_returns_message() {
     client
         .call_tool(
             CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
-                serde_json::json!({"information": "placeholder to create collection"}),
+                &serde_json::json!({"information": "placeholder to create collection"}),
             )),
         )
         .await
@@ -1045,7 +1063,7 @@ async fn mcp_find_no_results_returns_message() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-find")
-                .with_arguments(json_args(serde_json::json!({"query": "anything"}))),
+                .with_arguments(json_args(&serde_json::json!({"query": "anything"}))),
         )
         .await
         .unwrap();
@@ -1073,7 +1091,7 @@ async fn mcp_find_arbitrary_filter_rejected_when_disabled() {
     client
         .call_tool(
             CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "information": "test document"
                 }),
             )),
@@ -1084,7 +1102,7 @@ async fn mcp_find_arbitrary_filter_rejected_when_disabled() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-find").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "query": "test",
                     "query_filter": {"must": [{"key": "x", "match": {"value": "y"}}]}
                 }),
@@ -1114,7 +1132,7 @@ async fn mcp_find_with_arbitrary_filter_when_enabled() {
     client
         .call_tool(
             CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "information": "Berlin is a city in Germany",
                     "metadata": {"country": "Germany"}
                 }),
@@ -1126,7 +1144,7 @@ async fn mcp_find_with_arbitrary_filter_when_enabled() {
     client
         .call_tool(
             CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "information": "Tokyo is a city in Japan",
                     "metadata": {"country": "Japan"}
                 }),
@@ -1138,7 +1156,7 @@ async fn mcp_find_with_arbitrary_filter_when_enabled() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-find").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "query": "city",
                     "query_filter": {
                         "must": [{"key": "country", "match": {"value": "Germany"}}]
@@ -1170,7 +1188,7 @@ async fn mcp_store_with_non_object_metadata_ignored() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
-                serde_json::json!({
+                &serde_json::json!({
                     "information": "test with bad metadata",
                     "metadata": "not an object"
                 }),
@@ -1184,7 +1202,7 @@ async fn mcp_store_with_non_object_metadata_ignored() {
     let result = client
         .call_tool(
             CallToolRequestParams::new("qdrant-find")
-                .with_arguments(json_args(serde_json::json!({"query": "bad metadata"}))),
+                .with_arguments(json_args(&serde_json::json!({"query": "bad metadata"}))),
         )
         .await
         .unwrap();

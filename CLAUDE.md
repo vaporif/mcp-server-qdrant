@@ -62,6 +62,7 @@ cargo build --no-default-features --features candle
 - `QDRANT_SEARCH_LIMIT` — Max search results (default: 10)
 - `QDRANT_READ_ONLY` — Read-only mode (default: false)
 - `EMBEDDING_MODEL` — Embedding model name (default: sentence-transformers/all-MiniLM-L6-v2)
+- `QDRANT_ALLOW_ARBITRARY_FILTER` — Allow raw Qdrant filter syntax in queries (default: false)
 - `MCP_TRANSPORT` — Transport protocol: stdio, sse, streamable-http (default: stdio)
 - `HOST` — Bind host for SSE/HTTP (default: 127.0.0.1)
 - `PORT` — Bind port for SSE/HTTP (default: 8000)

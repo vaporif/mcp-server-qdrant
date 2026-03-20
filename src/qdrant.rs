@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use qdrant_client::qdrant::{
     CreateCollectionBuilder, CreateFieldIndexCollectionBuilder, Distance,
-    FieldType as QdrantFieldType, Filter, PointStruct, QueryPointsBuilder, UpsertPointsBuilder,
-    VectorParamsBuilder, value::Kind,
+    FieldType as QdrantFieldType, Filter, PointStruct, QueryPointsBuilder, Range,
+    UpsertPointsBuilder, VectorParamsBuilder, value::Kind,
 };
 use qdrant_client::{Payload, Qdrant};
 
@@ -164,12 +164,23 @@ impl QdrantConnector {
     }
 }
 
-/// Convert a JSON value to a Qdrant Filter.
-///
-/// Expects the Qdrant REST API filter format, e.g.:
-/// ```json
-/// { "must": [{ "key": "city", "match": { "value": "London" } }] }
-/// ```
+fn parse_range(obj: &serde_json::Value) -> Result<Range> {
+    let as_f64 = |key: &str| -> Option<f64> { obj.get(key).and_then(serde_json::Value::as_f64) };
+
+    let gt = as_f64("gt");
+    let gte = as_f64("gte");
+    let lt = as_f64("lt");
+    let lte = as_f64("lte");
+
+    if gt.is_none() && gte.is_none() && lt.is_none() && lte.is_none() {
+        return Err(Error::Config(
+            "range condition must have at least one of: gt, gte, lt, lte".into(),
+        ));
+    }
+
+    Ok(Range { gt, gte, lt, lte })
+}
+
 /// Convert a JSON value to a Qdrant Filter.
 ///
 /// Expects the Qdrant REST API filter format, e.g.:
@@ -197,6 +208,11 @@ pub fn json_to_qdrant_filter(value: &serde_json::Value) -> Result<Filter> {
                 return Ok(Condition::matches(key, b));
             }
             return Err(Error::Config("unsupported match value type".into()));
+        }
+
+        if let Some(range_obj) = c.get("range") {
+            let range = parse_range(range_obj)?;
+            return Ok(Condition::range(key, range));
         }
 
         Err(Error::Config(format!(
