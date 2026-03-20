@@ -86,7 +86,7 @@ impl QdrantConnector {
         Ok(())
     }
 
-    pub async fn store(&self, entry: Entry, collection_name: &str) -> Result<()> {
+    pub async fn store(&self, entry: Entry, collection_name: &str) -> Result<String> {
         self.ensure_collection(collection_name).await?;
 
         let vector = self.embedding.embed(&entry.content).await?;
@@ -106,13 +106,13 @@ impl QdrantConnector {
         }
 
         let id = uuid::Uuid::new_v4().to_string();
-        let point = PointStruct::new(id, vector, payload);
+        let point = PointStruct::new(id.clone(), vector, payload);
 
         self.client
             .upsert_points(UpsertPointsBuilder::new(collection_name, vec![point]).wait(true))
             .await?;
 
-        Ok(())
+        Ok(id)
     }
 
     pub async fn search(

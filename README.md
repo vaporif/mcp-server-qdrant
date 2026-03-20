@@ -1,6 +1,6 @@
 # mcp-server-qdrant
 
-[![Check](https://github.com/vaporif/mcp-server-qdrant/actions/workflows/check.yml/badge.svg)](https://github.com/vaporif/mcp-server-qdrant/actions/workflows/check.yml)
+[![CI](https://github.com/vaporif/mcp-server-qdrant/actions/workflows/ci.yml/badge.svg)](https://github.com/vaporif/mcp-server-qdrant/actions/workflows/ci.yml)
 
 Rust MCP server for Qdrant with local BERT embeddings. Single binary, no Python.
 
