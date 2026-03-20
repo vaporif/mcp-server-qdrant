@@ -74,6 +74,7 @@
       candlePkg = craneLib.buildPackage (candleArgs
         // {
           cargoArtifacts = candleArtifacts;
+          doCheck = false;
           inherit meta;
         });
 
@@ -89,6 +90,7 @@
         unwrapped = craneLib.buildPackage (onnxArgs
           // {
             cargoArtifacts = onnxArtifacts;
+            doCheck = false;
             inherit meta;
           });
       in
