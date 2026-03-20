@@ -192,13 +192,14 @@ impl QdrantMcpServer {
             metadata,
         };
 
-        self.connector
+        let point_id = self
+            .connector
             .store(entry, &collection)
             .await
             .map_err(|e| McpError::internal_error(format!("store failed: {e}"), None))?;
 
         Ok(CallToolResult::success(vec![Content::text(format!(
-            "stored in collection '{collection}'"
+            "stored (id={point_id}) in collection '{collection}'"
         ))]))
     }
 

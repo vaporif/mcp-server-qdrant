@@ -136,6 +136,34 @@ async fn schema_test_client(
 
 #[tokio::test]
 #[ignore = "requires running Qdrant instance"]
+async fn store_returns_point_id() {
+    let collection = unique_collection();
+    let _guard = CollectionGuard {
+        name: collection.clone(),
+    };
+
+    let connector = connector_for(&qdrant_config(&collection)).await;
+
+    let point_id = connector
+        .store(
+            Entry {
+                content: "Test document for point ID".to_string(),
+                metadata: None,
+            },
+            &collection,
+        )
+        .await
+        .unwrap();
+
+    assert!(!point_id.is_empty(), "point_id should not be empty");
+    assert!(
+        uuid::Uuid::parse_str(&point_id).is_ok(),
+        "point_id should be a valid UUID, got: {point_id}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires running Qdrant instance"]
 async fn store_and_search_basic() {
     let collection = unique_collection();
     let _guard = CollectionGuard {
@@ -805,6 +833,35 @@ fn make_filter_default_condition_is_eq() {
 
     let filter = mcp_server_qdrant::filters::make_filter(&fields, &values).unwrap();
     assert_eq!(filter.must.len(), 1);
+}
+
+#[tokio::test]
+#[ignore = "requires running Qdrant instance"]
+async fn mcp_store_returns_point_id() {
+    let collection = unique_collection();
+    let _guard = CollectionGuard {
+        name: collection.clone(),
+    };
+
+    let client = mcp_client_for(default_config(qdrant_config(&collection))).await;
+
+    let result = client
+        .call_tool(
+            CallToolRequestParams::new("qdrant-store").with_arguments(json_args(
+                serde_json::json!({
+                    "information": "Test document for point ID via MCP"
+                }),
+            )),
+        )
+        .await
+        .unwrap();
+
+    let text = result_text(&result);
+    assert!(text.contains("id="), "expected 'id=' in result: {text}");
+    assert!(
+        text.contains("stored"),
+        "expected 'stored' in result: {text}"
+    );
 }
 
 #[tokio::test]
