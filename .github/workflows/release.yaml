@@ -100,7 +100,7 @@ jobs:
           - target: x86_64-apple-darwin
             os: macos-latest
             platform_tag: ""
-            cargo_flags: ""
+            cargo_flags: "--no-default-features --features candle"
           - target: aarch64-apple-darwin
             os: macos-latest
             platform_tag: ""
