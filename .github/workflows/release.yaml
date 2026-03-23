@@ -92,15 +92,19 @@ jobs:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
             platform_tag: musllinux_1_2_x86_64
+            cargo_flags: "--no-default-features --features candle"
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
             platform_tag: musllinux_1_2_aarch64
+            cargo_flags: "--no-default-features --features candle"
           - target: x86_64-apple-darwin
             os: macos-latest
             platform_tag: ""
+            cargo_flags: ""
           - target: aarch64-apple-darwin
             os: macos-latest
             platform_tag: ""
+            cargo_flags: ""
     steps:
       - uses: actions/checkout@v6
 
@@ -117,6 +121,7 @@ jobs:
         run: |
           nix develop --command maturin build --release \
             --target ${{ matrix.target }} \
+            ${{ matrix.cargo_flags }} \
             --out dist
 
       - name: Fix platform tag
