@@ -1,6 +1,6 @@
 [package]
 name = "mcp-server-qdrant"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 description = "MCP server for Qdrant vector database with local embedding support"
 license = "Apache-2.0"
