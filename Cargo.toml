@@ -36,7 +36,7 @@ onnx = ["dep:ort", "dep:ndarray", "ort/load-dynamic"]
 onnx-fetch = ["dep:ort", "dep:ndarray", "ort/download-binaries", "ort/copy-dylibs", "ort/tls-native"]
 
 [dependencies]
-rmcp = { version = "1.1", features = ["server", "transport-io", "transport-streamable-http-server"] }
+rmcp = { version = "1.3", features = ["server", "transport-io", "transport-streamable-http-server"] }
 
 qdrant-client = { version = "1", default-features = false, features = ["download_snapshots", "serde"] }
 
@@ -68,4 +68,4 @@ uuid = { version = "1", features = ["v4"] }
 async-trait = "0.1"
 
 [dev-dependencies]
-rmcp = { version = "1.1", features = ["client"] }
+rmcp = { version = "1.3", features = ["client"] }
